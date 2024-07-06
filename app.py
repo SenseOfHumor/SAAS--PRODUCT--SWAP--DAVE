@@ -32,7 +32,7 @@ def generate_data_store():
     save_to_chroma(chunks)
 
 def load_documents():
-    loader = DirectoryLoader(DATA_PATH, glob = "*.md")
+    loader = DirectoryLoader(DATA_PATH, glob = "*.pdf")
     documents = loader.load()
     return documents
 
@@ -45,9 +45,11 @@ def split_text(documents: list[Document]):
     chunks = text_splitter.split_documents(documents)
     print(f"Split {len(documents)} documents into {len(chunks)} chunks")
 
-    document = chunks[10]
+    document = chunks[10]  ## get the 10th chunk
     print(document.page_content)
     print(document.metadata)
+
+    return chunks
 
 def save_to_chroma(chunks: list[Document]):
     ## clear the db first
@@ -62,6 +64,16 @@ def save_to_chroma(chunks: list[Document]):
     #db.persist()
     print(f"Saved {len(chunks)} chunks to {CHROMA_PATH}")
 
-    return chunks
+if __name__ == "__main__":
+    main()
 
-# split_text(load_documents())
+split_text(load_documents())
+query_text = input("Enter the text to search for: ")
+## prep the db
+embedding_function = OpenAIEmbeddings()
+db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+
+##search the db
+results = db.similarity_search_with_relevance_scores(query_text, k=3) ##k is the number of results
+if len(results) == 0 or results[0][1] < 0.7:
+    print(f"No results found for '{query_text}'")
