@@ -11,6 +11,7 @@ import argparse
 #from langchain import OpenAIEmbeddings
 
 from langchain_community.vectorstores.chroma import Chroma
+from langchain.prompts.chat import ChatPromptTemplate
 import os
 import shutil
 
@@ -22,25 +23,8 @@ CHROMA_PATH = "chroma"
 
 
 def main():
-    #CLI
-    parser = argparse.ArgumentParser()
-    parser.add_argument("query_text", type=str, help="The text to search for")
-    args = parser.parse_args()
-    print("Enter the text to search for: ")
-    query_text = input("Enter the text to search for: ")
+    generate_data_store()
 
-    ## prep the db
-    embedding_function = OpenAIEmbeddings()
-    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
-
-    ##search the db
-    results = db.similarity_search_with_relevance_score(query_text, k=3) ##k is the number of results
-    if len(results) == 0 or results[0][1] < 0.7:
-        print(f"No results found for '{query_text}'")
-        return
-    
-    context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
-    print(context_text)
 
 def generate_data_store():
     documents = load_documents()
@@ -65,6 +49,7 @@ def split_text(documents: list[Document]):
     print(document.page_content)
     print(document.metadata)
 
+def save_to_chroma(chunks: list[Document]):
     ## clear the db first
     if os.path.exists(CHROMA_PATH):
         shutil.rmtree(CHROMA_PATH)
@@ -79,29 +64,4 @@ def split_text(documents: list[Document]):
 
     return chunks
 
-split_text(load_documents())
-
-# ## prep the db
-# embedding_function = OpenAIEmbeddings()
-# db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
-
-# ##search the db
-# results = db.similarity_search_with_relevance_score(query_text, k=3) ##k is the number of results
-# List[Tuple[Document, float]]
-
-print("Enter the text to search for: ")
-query_text = input("Enter the text to search for: ")
-
-## prep the db
-embedding_function = OpenAIEmbeddings()
-db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
-
-##search the db
-results = db.similarity_search_with_relevance_scores(query_text, k=3) ##k is the number of results
-if len(results) == 0 or results[0][1] < 0.7:
-    print(f"No results found for '{query_text}'")
-    
-
-context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
-print(context_text)
-
+# split_text(load_documents())
