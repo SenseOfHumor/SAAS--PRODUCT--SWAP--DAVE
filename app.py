@@ -1,11 +1,107 @@
 import os
 from dotenv import load_dotenv
-import llama_index
+from datasets import load_dataset
+import pandas as pd
+import numpy as np
+from langchain_community.document_loaders import DirectoryLoader
+from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain.schema import Document
+from langchain_openai import OpenAIEmbeddings
+import argparse
+#from langchain import OpenAIEmbeddings
 
+from langchain_community.vectorstores.chroma import Chroma
+import os
+import shutil
+
+from langchain_community.document_loaders import DirectoryLoader
 
 load_dotenv()
+DATA_PATH = "data/pdfs"
+CHROMA_PATH = "chroma"
 
-os.environ = os.getenv("OPENAI_API_KEY")
 
-from llama_index import VectorStoreIndex, SimpleDirectoryReader
-documents = SimpleDirectoryReader("data").load_data()
+def main():
+    #CLI
+    parser = argparse.ArgumentParser()
+    parser.add_argument("query_text", type=str, help="The text to search for")
+    args = parser.parse_args()
+    print("Enter the text to search for: ")
+    query_text = input("Enter the text to search for: ")
+
+    ## prep the db
+    embedding_function = OpenAIEmbeddings()
+    db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+
+    ##search the db
+    results = db.similarity_search_with_relevance_score(query_text, k=3) ##k is the number of results
+    if len(results) == 0 or results[0][1] < 0.7:
+        print(f"No results found for '{query_text}'")
+        return
+    
+    context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
+    print(context_text)
+
+def generate_data_store():
+    documents = load_documents()
+    chunks = split_text(documents)
+    save_to_chroma(chunks)
+
+def load_documents():
+    loader = DirectoryLoader(DATA_PATH, glob = "*.md")
+    documents = loader.load()
+    return documents
+
+def split_text(documents: list[Document]):
+    text_splitter = RecursiveCharacterTextSplitter(chunk_size = 256, 
+                                                   chunk_overlap = 20,
+                                                   length_function = len,
+                                                   add_start_index = True,
+                                                   )
+    chunks = text_splitter.split_documents(documents)
+    print(f"Split {len(documents)} documents into {len(chunks)} chunks")
+
+    document = chunks[10]
+    print(document.page_content)
+    print(document.metadata)
+
+    ## clear the db first
+    if os.path.exists(CHROMA_PATH):
+        shutil.rmtree(CHROMA_PATH)
+    
+    ## new DB from the docs
+    db = Chroma.from_documents(
+        chunks, OpenAIEmbeddings(), persist_directory=CHROMA_PATH
+    )
+
+    #db.persist()
+    print(f"Saved {len(chunks)} chunks to {CHROMA_PATH}")
+
+    return chunks
+
+split_text(load_documents())
+
+# ## prep the db
+# embedding_function = OpenAIEmbeddings()
+# db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+
+# ##search the db
+# results = db.similarity_search_with_relevance_score(query_text, k=3) ##k is the number of results
+# List[Tuple[Document, float]]
+
+print("Enter the text to search for: ")
+query_text = input("Enter the text to search for: ")
+
+## prep the db
+embedding_function = OpenAIEmbeddings()
+db = Chroma(persist_directory=CHROMA_PATH, embedding_function=embedding_function)
+
+##search the db
+results = db.similarity_search_with_relevance_scores(query_text, k=3) ##k is the number of results
+if len(results) == 0 or results[0][1] < 0.7:
+    print(f"No results found for '{query_text}'")
+    
+
+context_text = "\n\n---\n\n".join([doc.page_content for doc, _score in results])
+print(context_text)
+
