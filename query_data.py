@@ -58,8 +58,10 @@ def main():
     response_text = model.invoke(prompt)
 
     sources = [doc.metadata.get("source", None) for doc, _score in results]
-    formatted_response = f"Response from {response_text}\nSources: {sources}"
+    formatted_response = f"\n\nResponse from {response_text}\nSources: {sources}"
     print(formatted_response)
+    print
+    
 
 if __name__ == "__main__":
     main()
